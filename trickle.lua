@@ -5,7 +5,7 @@
 local trickle = {}
 
 local bit = bit32 or require 'bit'
-local lshift, rshift, band, bxor, bnot = bit.lshift, bit.rshift, bit.band, bit.bxor, bit.bnot
+local lshift, rshift, band, bxor, bnot, tobit = bit.lshift, bit.rshift, bit.band, bit.bxor, bit.bnot, bit.tobit
 
 local extract = bit.extract or function(x, i, n)
   return band(rshift(x, i), lshift(1, n or 1) - 1)
@@ -43,13 +43,21 @@ function trickle:clear()
   return self
 end
 
-function trickle:write(x, sig)
-  if sig == 'string' then self:writeString(x)
-  elseif sig == 'bool' then self:writeBool(x)
-  elseif sig == 'float' then self:writeFloat(x)
+function trickle:write(x, kind)
+  if kind == 'string' then self:writeString(x)
+  elseif kind == 'cstring' then self:writeCString(x)
+  elseif kind == 'bool' then self:writeBool(x)
+  elseif kind == 'float' then self:writeFloat(x)
   else
-    local n = sig:match('(%d+)bit')
-    self:writeBits(x, n)
+    local n = tonumber(kind:match('(%d+)bit'))
+    if n then self:writeBits(x, n)
+    else
+      n = tonumber(kind:match('^[ui](%d+)$'))
+      if n then self:writeBits(x, n)
+      else
+        error('Couldn\'t parse kind ' .. tostring(kind))
+      end
+    end
   end
 
   return self
@@ -59,6 +67,14 @@ function trickle:writeString(string)
   self:truncate()
   string = tostring(string)
   self.str = self.str .. string.char(#string) .. string
+end
+
+function trickle:writeCString(str)
+  for i = 1, #str do
+    local byte = string.byte(str, i)
+    self:writeBits(byte, 8)
+  end
+  self:writeBits(0x00, 8)
 end
 
 function trickle:writeBool(bool)
@@ -92,11 +108,27 @@ end
 
 function trickle:read(kind)
   if kind == 'string' then return self:readString()
+  elseif kind == 'cstring' then return self:readCString()
   elseif kind == 'bool' then return self:readBool()
   elseif kind == 'float' then return self:readFloat()
   else
     local n = tonumber(kind:match('(%d+)bit'))
-    return self:readBits(n)
+    if n then return self:readBits(n)
+    else
+      local sign
+      sign, n = kind:match('^([ui])(%d+)$')
+      n = tonumber(n)
+
+      if sign and n then
+        if sign == 'u' then
+          return self:readBits(n)
+        elseif sign == 'i' then
+          return tobit(self:readBits(n))
+        end
+      else
+        error('Couldn\'t parse kind ' .. tostring(kind))
+      end
+    end
   end
 end
 
@@ -114,6 +146,19 @@ function trickle:readString()
     self.str = self.str:sub(len + 1)
   end
   return res
+end
+
+function trickle:readCString()
+  local chars = {}
+
+  while true do
+    local byte = self:readBits(8)
+    if byte == 0x00 then break end
+
+    table.insert(chars, string.char(byte))
+  end
+
+  return table.concat(chars, '')
 end
 
 function trickle:readBool()
