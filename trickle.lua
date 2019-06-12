@@ -36,6 +36,15 @@ function trickle:truncate()
   return self.str
 end
 
+function trickle:tostring()
+  local str = self.str
+  if self.byte then
+    return str .. string.char(self.byte)
+  end
+
+  return str
+end
+
 function trickle:clear()
   self.str = ''
   self.byte = nil
@@ -280,7 +289,7 @@ function trickle:unpack(signature)
   return data
 end
 
-trickle.__tostring = trickle.truncate
+trickle.__tostring = trickle.tostring
 trickle.__index = trickle
 
 return { create = trickle.create }
