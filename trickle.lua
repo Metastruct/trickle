@@ -54,6 +54,7 @@ end
 
 function trickle:write(x, kind)
   if kind == 'byte' then self:writeByte(x)
+  elseif kind == 'char' then self:writeChar(x)
   elseif kind == 'bytes' then self:writeBytes(x)
   elseif kind == 'string' then self:writeString(x)
   elseif kind == 'cstring' then self:writeCString(x)
@@ -78,10 +79,13 @@ function trickle:writeByte(byte)
   self:writeBits(byte, 8)
 end
 
+function trickle:writeChar(char)
+  self:writeByte(string.byte(char))
+end
+
 function trickle:writeBytes(str)
   for i = 1, #str do
-    local byte = string.byte(str, i)
-    self:writeByte(byte)
+    self:writeChar(string.sub(str, i, i))
   end
 end
 
@@ -127,6 +131,7 @@ end
 
 function trickle:read(kind, bytesLen)
   if kind == 'byte' then return self:readByte()
+  elseif kind == 'char' then return self:readChar()
   elseif kind == 'bytes' then return self:readBytes(bytesLen)
   elseif kind == 'string' then return self:readString()
   elseif kind == 'cstring' then return self:readCString()
@@ -157,11 +162,14 @@ function trickle:readByte()
   return self:readBits(8)
 end
 
+function trickle:readChar()
+  return string.char(self:readByte())
+end
+
 function trickle:readBytes(len)
   local chars = {}
   for i = 1, len do
-    local char = string.char(self:readByte())
-    table.insert(chars, char)
+    table.insert(chars, self:readChar())
   end
   return table.concat(chars, '')
 end
@@ -185,10 +193,10 @@ end
 function trickle:readCString()
   local chars = {}
   while true do
-    local byte = self:readByte()
-    if byte == 0x00 then break end
+    local char = self:readChar()
+    if char == "\x00" then break end
 
-    table.insert(chars, string.char(byte))
+    table.insert(chars, char)
   end
   return table.concat(chars, '')
 end
