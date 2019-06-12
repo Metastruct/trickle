@@ -44,7 +44,9 @@ function trickle:clear()
 end
 
 function trickle:write(x, kind)
-  if kind == 'string' then self:writeString(x)
+  if kind == 'byte' then self:writeByte(x)
+  elseif kind == 'bytes' then self:writeBytes(x)
+  elseif kind == 'string' then self:writeString(x)
   elseif kind == 'cstring' then self:writeCString(x)
   elseif kind == 'bool' then self:writeBool(x)
   elseif kind == 'float' then self:writeFloat(x)
@@ -63,6 +65,17 @@ function trickle:write(x, kind)
   return self
 end
 
+function trickle:writeByte(byte)
+  self:writeBits(byte, 8)
+end
+
+function trickle:writeBytes(str)
+  for i = 1, #str do
+    local byte = string.byte(str, i)
+    self:writeByte(byte)
+  end
+end
+
 function trickle:writeString(string)
   self:truncate()
   string = tostring(string)
@@ -70,10 +83,7 @@ function trickle:writeString(string)
 end
 
 function trickle:writeCString(str)
-  for i = 1, #str do
-    local byte = string.byte(str, i)
-    self:writeBits(byte, 8)
-  end
+  self:writeBytes(str)
   self:writeBits(0x00, 8)
 end
 
@@ -106,8 +116,10 @@ function trickle:writeBits(x, n)
   until n == 0
 end
 
-function trickle:read(kind)
-  if kind == 'string' then return self:readString()
+function trickle:read(kind, bytesLen)
+  if kind == 'byte' then return self:readByte()
+  elseif kind == 'bytes' then return self:readBytes(bytesLen)
+  elseif kind == 'string' then return self:readString()
   elseif kind == 'cstring' then return self:readCString()
   elseif kind == 'bool' then return self:readBool()
   elseif kind == 'float' then return self:readFloat()
@@ -132,6 +144,19 @@ function trickle:read(kind)
   end
 end
 
+function trickle:readByte()
+  return self:readBits(8)
+end
+
+function trickle:readBytes(len)
+  local chars = {}
+  for i = 1, len do
+    local char = string.char(self:readByte())
+    table.insert(chars, char)
+  end
+  return table.concat(chars, '')
+end
+
 function trickle:readString()
   if self.byte then
     self.str = self.str:sub(2)
@@ -150,14 +175,12 @@ end
 
 function trickle:readCString()
   local chars = {}
-
   while true do
-    local byte = self:readBits(8)
+    local byte = self:readByte()
     if byte == 0x00 then break end
 
     table.insert(chars, string.char(byte))
   end
-
   return table.concat(chars, '')
 end
 
