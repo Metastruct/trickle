@@ -302,8 +302,8 @@ function trickle:getNumBitsLeft()
 end
 
 function trickle:getNumBytesLeft()
-  -- round up to byte
-  return math.ceil(self:getNumBitsLeft() / 8)
+  -- round down to byte so 1 bit left means 0 bytes left
+  return math.floor(self:getNumBitsLeft() / 8)
 end
 
 function trickle:getNumBitsWritten()
@@ -311,7 +311,7 @@ function trickle:getNumBitsWritten()
 end
 
 function trickle:getNumBytesWritten()
-  -- round up to byte
+  -- round up to byte so 1 bit written means 1 byte written
   return math.ceil(self:getNumBitsWritten() / 8)
 end
 
