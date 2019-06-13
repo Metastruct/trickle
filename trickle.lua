@@ -297,6 +297,24 @@ function trickle:unpack(signature)
   return data
 end
 
+function trickle:getNumBitsLeft()
+  return (#self.str * 8) - (self.byteLen or 0)
+end
+
+function trickle:getNumBytesLeft()
+  -- round up to byte
+  return math.ceil(self:getNumBitsLeft() / 8)
+end
+
+function trickle:getNumBitsWritten()
+  return (#self.str * 8) + (self.byteLen or 0)
+end
+
+function trickle:getNumBytesWritten()
+  -- round up to byte
+  return math.ceil(self:getNumBitsWritten() / 8)
+end
+
 trickle.__tostring = trickle.tostring
 trickle.__index = trickle
 
