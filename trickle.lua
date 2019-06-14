@@ -266,6 +266,7 @@ function trickle:pack(data, signature)
       end
     end
   end
+  return self
 end
 
 function trickle:unpack(signature)
