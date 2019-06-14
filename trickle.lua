@@ -52,6 +52,13 @@ function trickle:clear()
   return self
 end
 
+function trickle:copy()
+  local new = trickle.create(self.str)
+  new.byte = self.byte
+  new.byteLen = self.byteLen
+  return new
+end
+
 function trickle:write(x, kind)
   if kind == 'byte' then self:writeByte(x)
   elseif kind == 'char' then self:writeChar(x)
