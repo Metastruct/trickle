@@ -298,7 +298,11 @@ function trickle:unpack(signature)
         data[sig[1]] = {}
         for i = 1, ct do table.insert(data[sig[1]], self:unpack(sig[2])) end
       else
-        data[sig[1]] = self:read(sig[2])
+        if sig[2] == 'bytes' then
+          data[sig[1]] = self:read(sig[2], sig[3])
+        else
+          data[sig[1]] = self:read(sig[2])
+        end
       end
     end
   end
