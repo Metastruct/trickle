@@ -16,9 +16,19 @@ local replace = bit.replace or function(x, y, i, n)
   return bit.bxor(x, bit.band(bit.bxor(x, lshift(y, i)), mask))
 end
 
-function trickle.create(str)
+function trickle.create(bytesOrString)
+  local bytes = bytesOrString
+
+  if type(bytesOrString) == 'string' then
+    -- insert in reverse order so we can pop efficiently with table.remove
+    bytes = {}
+    for i = #bytesOrString, 1, -1 do
+      table.insert(bytes, string.byte(bytesOrString, i))
+    end
+  end
+
   local stream = {
-    str = str or '',
+    bytes = bytes or {},
     byte = nil,
     byteLen = nil
   }
@@ -28,32 +38,34 @@ end
 
 function trickle:truncate()
   if self.byte then
-    self.str = self.str .. string.char(self.byte)
+    table.insert(self.bytes, string.char(self.byte))
     self.byte = nil
     self.byteLen = nil
   end
-
-  return self.str
 end
 
 function trickle:tostring()
-  local str = self.str
-  if self.byte then
-    return str .. string.char(self.byte)
+  local chars = {}
+  for i = #self.bytes, 1, -1 do
+    table.insert(chars, string.char(self.bytes[i]))
   end
 
-  return str
+  if self.byte then
+    table.insert(chars, string.char(self.byte))
+  end
+
+  return table.concat(chars)
 end
 
 function trickle:clear()
-  self.str = ''
+  self.bytes = {}
   self.byte = nil
   self.byteLen = nil
   return self
 end
 
 function trickle:copy()
-  local new = trickle.create(self.str)
+  local new = trickle.create(self.bytes)
   new.byte = self.byte
   new.byteLen = self.byteLen
   return new
@@ -90,30 +102,20 @@ function trickle:writeChar(char)
   self:writeByte(string.byte(char))
 end
 
-function trickle:writeBytes(str)
-  for i = 1, #str do
-    self:writeChar(string.sub(str, i, i))
+function trickle:writeBytes(bytesString)
+  for i = 1, #bytesString do
+    self:writeChar(string.sub(bytesString, i, i))
   end
-end
-
-function trickle:writeString(string)
-  self:truncate()
-  string = tostring(string)
-  self.str = self.str .. string.char(#string) .. string
 end
 
 function trickle:writeCString(str)
   self:writeBytes(str)
-  self:writeBits(0x00, 8)
+  self:writeByte(0x00)
 end
 
 function trickle:writeBool(bool)
   local x = bool and 1 or 0
   self:writeBits(x, 1)
-end
-
-function trickle:writeFloat(float)
-  self:writeString(float)
 end
 
 function trickle:writeBits(x, n)
@@ -126,7 +128,9 @@ function trickle:writeBits(x, n)
     self.byteLen = self.byteLen + numWrite
 
     if self.byteLen == 8 then
-      self.str = self.str .. string.char(self.byte)
+      -- insert to the front of the list because bytes is reversed
+      -- so that readBits is more efficient in popping from the end
+      table.insert(self.bytes, 1, self.byte)
       self.byte = nil
       self.byteLen = nil
     end
@@ -181,22 +185,6 @@ function trickle:readBytes(len)
   return table.concat(chars, '')
 end
 
-function trickle:readString()
-  if self.byte then
-    self.str = self.str:sub(2)
-    self.byte = nil
-    self.byteLen = nil
-  end
-  local len = self.str:byte(1)
-  local res = ''
-  if len then
-    self.str = self.str:sub(2)
-    res = self.str:sub(1, len)
-    self.str = self.str:sub(len + 1)
-  end
-  return res
-end
-
 function trickle:readCString()
   local chars = {}
   while true do
@@ -212,21 +200,19 @@ function trickle:readBool()
   return self:readBits(1) > 0
 end
 
-function trickle:readFloat()
-  return tonumber(self:readString())
-end
-
 function trickle:readBits(n)
   local x = 0
   local idx = 0
   while n > 0 do
-    if not self.byte then self.byte = self.str:byte(1) or 0 self.byteLen = 0 end
+    if not self.byte then
+      self.byte = self.bytes[#self.bytes] or 0 self.byteLen = 0
+    end
     local numRead = math.min(n, (7 - self.byteLen) + 1)
     x = x + (extract(self.byte, self.byteLen, numRead) * (2 ^ idx))
     self.byteLen = self.byteLen + numRead
 
     if self.byteLen == 8 then
-      self.str = self.str:sub(2)
+      table.remove(self.bytes)
       self.byte = nil
       self.byteLen = nil
     end
@@ -310,7 +296,7 @@ function trickle:unpack(signature)
 end
 
 function trickle:getNumBitsLeft()
-  return (#self.str * 8) - (self.byteLen or 0)
+  return (#self.bytes * 8) - (self.byteLen or 0)
 end
 
 function trickle:getNumBytesLeft()
@@ -319,7 +305,7 @@ function trickle:getNumBytesLeft()
 end
 
 function trickle:getNumBitsWritten()
-  return (#self.str * 8) + (self.byteLen or 0)
+  return (#self.bytes * 8) + (self.byteLen or 0)
 end
 
 function trickle:getNumBytesWritten()
