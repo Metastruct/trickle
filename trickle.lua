@@ -16,19 +16,20 @@ local replace = bit.replace or function(x, y, i, n)
   return bit.bxor(x, bit.band(bit.bxor(x, lshift(y, i)), mask))
 end
 
-function trickle.create(bytesOrString)
-  local bytes = bytesOrString
+function trickle.create(byteString)
+  local bytes = {}
 
-  if type(bytesOrString) == 'string' then
-    -- insert in reverse order so we can pop efficiently with table.remove
-    bytes = {}
-    for i = #bytesOrString, 1, -1 do
-      table.insert(bytes, string.byte(bytesOrString, i))
+  if byteString then
+    assert(type(byteString) == 'string')
+
+    -- insert in reverse order so we can pop efficiently in readBits with table.remove
+    for i = #byteString, 1, -1 do
+      table.insert(bytes, string.byte(byteString, i))
     end
   end
 
   local stream = {
-    bytes = bytes or {},
+    bytes = bytes,
     byte = nil,
     byteLen = nil
   }
@@ -65,7 +66,11 @@ function trickle:clear()
 end
 
 function trickle:copy()
-  local new = trickle.create(self.bytes)
+  local new = trickle.create()
+  new.bytes = {}
+  for i = 1, #self.bytes do
+    table.insert(new.bytes, self.bytes[i])
+  end
   new.byte = self.byte
   new.byteLen = self.byteLen
   return new
