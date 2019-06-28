@@ -161,7 +161,7 @@ function trickle:read(kind, bytesLen)
         if sign == 'u' then
           return self:readBits(n)
         elseif sign == 'i' then
-          return tobit(self:readBits(n))
+          return self:readSignedBits(n)
         end
       else
         error('Couldn\'t parse kind ' .. tostring(kind))
@@ -223,6 +223,10 @@ function trickle:readBits(n)
   end
 
   return x
+end
+
+function trickle:readSignedBits(n)
+  return tobit(self:readBits(n))
 end
 
 function trickle:pack(data, signature)
